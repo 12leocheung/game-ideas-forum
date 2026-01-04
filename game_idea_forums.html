@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Lab | Community Concept Portal</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+  </style>
+</head>
+<body class="bg-[#0f172a] text-slate-200">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    const ADMIN_SECRET = "314159"; 
+    const GENRES = ['All', 'Action', 'Adventure', 'RPG', 'Strategy', 'Puzzle', 'Horror', 'Simulation', 'Sports', 'Platformer', 'Other'];
+    const BANNED_WORDS = ['spam', 'hack', 'hate', 'badword']; 
+
+    // --- UI COMPONENTS ---
+    const Icon = ({ path, color = "currentColor" }) => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={path}/></svg>
+    );
+
+    function GameLab() {
+      const [ideas, setIdeas] = useState([]);
+      const [title, setTitle] = useState('');
+      const [description, setDescription] = useState('');
+      const [genre, setGenre] = useState('Action');
+      const [selectedGenre, setSelectedGenre] = useState('All');
+      const [sortBy, setSortBy] = useState('newest');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [adminInput, setAdminInput] = useState('');
+      const [status, setStatus] = useState({ type: '', text: '' });
+      const [loading, setLoading] = useState(false);
+
+      useEffect(() => {
+        const stored = localStorage.getItem('gamelab_v5');
+        if (stored) setIdeas(JSON.parse(stored));
+      }, []);
+
+      const save = (data) => {
+        setIdeas(data);
+        localStorage.setItem('gamelab_v5', JSON.stringify(data));
+      };
+
+      const handlePost = () => {
+        if (!title.trim() || !description.trim()) return;
+        setLoading(true);
+        setStatus({ type: 'bot', text: 'Analyzing submission quality...' });
+
+        setTimeout(() => {
+          // Moderation Bot
+          const lowTitle = title.toLowerCase();
+          const lowDesc = description.toLowerCase();
+          if (BANNED_WORDS.some(w => lowTitle.includes(w) || lowDesc.includes(w))) {
+            setStatus({ type: 'error', text: 'Submission flagged for prohibited language.' });
+            setLoading(false);
+            return;
+          }
+          if (description.length < 20) {
+            setStatus({ type: 'error', text: 'Description must be at least 20 characters.' });
+            setLoading(false);
+            return;
+          }
+
+          const newIdea = {
+            id: Date.now().toString(),
+            title: title.trim(),
+            description: description.trim(),
+            genre,
+            upvotes: 0, downvotes: 0, score: 0,
+            timestamp: Date.now()
+          };
+
+          save([newIdea, ...ideas]);
+          setTitle(''); setDescription('');
+          setLoading(false);
+          setStatus({ type: 'success', text: 'Concept published to the live feed.' });
+        }, 800);
+      };
+
+      const handleVote = (id, delta) => {
+        const updated = ideas.map(idea => {
+          if (idea.id === id) {
+            const up = delta > 0 ? idea.upvotes + 1 : idea.upvotes;
+            const down = delta < 0 ? idea.downvotes + 1 : idea.downvotes;
+            return { ...idea, upvotes: up, downvotes: down, score: up - down };
+          }
+          return idea;
+        });
+        save(updated);
+      };
+
+      const filteredIdeas = useMemo(() => {
+        return ideas
+          .filter(i => (selectedGenre === 'All' || i.genre === selectedGenre))
+          .filter(i => (i.title.toLowerCase().includes(searchQuery.toLowerCase()) || i.description.toLowerCase().includes(searchQuery.toLowerCase())))
+          .sort((a, b) => sortBy === 'top' ? b.score - a.score : b.timestamp - a.timestamp);
+      }, [ideas, selectedGenre, searchQuery, sortBy]);
+
+      const isAdmin = adminInput === ADMIN_SECRET;
+
+      return (
+        <div className="min-h-screen">
+          {/* Global Header */}
+          <nav className="border-b border-slate-800 bg-[#0f172a]/80 backdrop-blur-md sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center font-black text-slate-900 italic">GL</div>
+                <span className="font-extrabold tracking-tighter text-xl">GAME<span className="text-amber-500">LAB</span></span>
+              </div>
+              <div className="flex items-center gap-4">
+                <input 
+                  type="password" placeholder="Access Code" value={adminInput}
+                  onChange={e => setAdminInput(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 rounded-full px-4 py-1 text-xs w-32 focus:border-amber-500 outline-none transition-all"
+                />
+                {isAdmin && <span className="text-green-500 text-[10px] font-bold tracking-widest animate-pulse">ADMIN MODE</span>}
+              </div>
+            </div>
+          </nav>
+
+          {/* Hero Section */}
+          <header className="py-16 px-6 text-center bg-gradient-to-b from-slate-900 to-[#0f172a] border-b border-slate-800">
+            <h1 className="text-5xl font-extrabold text-white mb-4">The Future of Gaming Starts Here</h1>
+            <p className="text-slate-400 max-w-2xl mx-auto text-lg">A professional concept board for developers and visionaries to share, rank, and refine next-generation game mechanics.</p>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-6 py-12 grid lg:grid-cols-12 gap-12">
+            
+            {/* Sidebar: Submit & Rules */}
+            <div className="lg:col-span-4 space-y-8">
+              <section className="bg-slate-800/40 p-8 rounded-3xl border border-slate-700 shadow-xl">
+                <h2 className="text-xl font-bold mb-6 flex items-center gap-2">Publish Concept</h2>
+                <div className="space-y-4">
+                  <input placeholder="Project Title" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 outline-none focus:ring-1 ring-amber-500 transition-all"/>
+                  <select value={genre} onChange={e => setGenre(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 outline-none">
+                    {GENRES.filter(g => g !== 'All').map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                  <textarea placeholder="Outline the core gameplay loop and mechanics..." value={description} onChange={e => setDescription(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 h-48 outline-none focus:ring-1 ring-amber-500 transition-all resize-none"/>
+                  <button onClick={handlePost} disabled={loading} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold py-4 rounded-xl shadow-lg transition-all transform active:scale-95 disabled:opacity-50">
+                    {loading ? 'MODERATING...' : 'POST TO PUBLIC FEED'}
+                  </button>
+                  {status.text && <div className={`text-center text-xs font-bold p-2 rounded-lg ${status.type === 'success' ? 'bg-green-500/10 text-green-400' : status.type === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-500'}`}>{status.text}</div>}
+                </div>
+              </section>
+
+              <section className="p-6 border border-slate-800 rounded-3xl opacity-60">
+                <h3 className="font-bold text-sm mb-4 tracking-widest text-amber-500">COMMUNITY GUIDELINES</h3>
+                <ul className="text-xs space-y-3 text-slate-400 leading-relaxed">
+                  <li>• Every concept is scanned for unique content.</li>
+                  <li>• Prohibited language is automatically filtered.</li>
+                  <li>• Ideas must contain 20+ characters of detail.</li>
+                  <li>• Vote objectively to help the best ideas rise.</li>
+                </ul>
+              </section>
+            </div>
+
+            {/* Feed Section */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* Search & Filter Bar */}
+              <div className="flex flex-col md:flex-row gap-4 bg-slate-800/20 p-4 rounded-2xl border border-slate-800">
+                <div className="flex-1 relative">
+                  <input 
+                    type="text" placeholder="Search concept archives..." 
+                    value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-900/50 border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:border-amber-500"
+                  />
+                  <div className="absolute left-3 top-2.5 opacity-30 italic font-bold">🔍</div>
+                </div>
+                <div className="flex gap-2">
+                  <select value={selectedGenre} onChange={e => setSelectedGenre(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm outline-none">
+                    {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                  <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm outline-none">
+                    <option value="newest">Recent</option>
+                    <option value="top">Top Rated</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Idea Cards */}
+              <div className="space-y-4">
+                {filteredIdeas.length === 0 ? (
+                  <div className="text-center py-20 bg-slate-900/30 rounded-3xl border border-dashed border-slate-800">
+                    <p className="text-slate-600 font-medium">No concepts found matching your criteria.</p>
+                  </div>
+                ) : (
+                  filteredIdeas.map(idea => (
+                    <div key={idea.id} className="bg-slate-800/40 border border-slate-800 rounded-3xl flex hover:bg-slate-800/60 transition-all">
+                      <div className="bg-slate-900/40 px-5 py-6 flex flex-col items-center gap-2">
+                        <button onClick={() => handleVote(idea.id, 1)} className="hover:text-amber-500 transition-colors">
+                          <Icon path="m18 15-6-6-6 6" />
+                        </button>
+                        <span className={`font-black text-xl ${idea.score > 0 ? 'text-amber-500' : 'text-slate-500'}`}>{idea.score}</span>
+                        <button onClick={() => handleVote(idea.id, -1)} className="hover:text-rose-500 transition-colors">
+                          <Icon path="m6 9 6 6 6-6" />
+                        </button>
+                      </div>
+                      <div className="p-8 flex-1">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-[10px] font-black bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full uppercase tracking-tighter">
+                            {idea.genre}
+                          </span>
+                          {isAdmin && (
+                            <button onClick={() => save(ideas.filter(i => i.id !== idea.id))} className="text-slate-600 hover:text-rose-500 transition-all">
+                               <Icon path="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                            </button>
+                          )}
+                        </div>
+                        <h3 className="text-2xl font-extrabold text-white leading-tight mb-3">{idea.title}</h3>
+                        <p className="text-slate-400 text-base leading-relaxed mb-6">{idea.description}</p>
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 border-t border-slate-800 pt-4">
+                           <div className="flex gap-4">
+                              <span>LIKES: {idea.upvotes}</span>
+                              <span>DISLIKES: {idea.downvotes}</span>
+                           </div>
+                           <span>POSTED {new Date(idea.timestamp).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </main>
+
+          <footer className="mt-20 border-t border-slate-800 py-10 text-center">
+            <p className="text-slate-600 text-xs font-bold tracking-widest uppercase">© 2026 Game Lab Collective. Professional Moderation Enabled.</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<GameLab />);
+  </script>
+</body>
+</html>
