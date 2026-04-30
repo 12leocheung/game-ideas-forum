@@ -1275,5 +1275,24 @@
         // Initialize
         loadIdeas();
     </script>
+    <script>
+  (function() {
+    try {
+      const hash = window.location.hash;
+      const match = hash.match(/[#&]inject=([^&]*)/);
+      if (match) {
+        const payload = JSON.parse(decodeURIComponent(escape(atob(match[1]))));
+        const stored = localStorage.getItem('gamelab_v5');
+        const existing = stored ? JSON.parse(stored) : [];
+        // avoid double-posting if page is refreshed
+        if (!existing.find(i => i.id === payload.id)) {
+          localStorage.setItem('gamelab_v5', JSON.stringify([payload, ...existing]));
+        }
+        // clean the URL so refreshing doesn't re-inject
+        history.replaceState(null, '', window.location.pathname);
+      }
+    } catch(e) {}
+  })();
+</script>
 </body>
 </html>
